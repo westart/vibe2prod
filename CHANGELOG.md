@@ -23,7 +23,7 @@ under 5 minutes, one command.
   Engine + compose plugin from the official repo, 1 GB swap file.
 - Stack: Traefik v3 (Let's Encrypt HTTP-01, 80→443 redirect, security
   headers, TLS ≥ 1.2, dashboard off), demo Node.js app (multi-stage build,
-  non-root image, `/health` with a real Postgres query), Postgres 16 with
+  non-root image, `/health` with a real Postgres query), Postgres 18 with
   named volume and healthcheck. Log rotation on all containers.
 - `DOMAIN=auto` fallback: HTTPS via sslip.io with a real certificate when no
   domain is configured.

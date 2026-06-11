@@ -1,4 +1,4 @@
-# vibe2prod stack: Traefik (TLS) -> app (Node demo) -> Postgres 16.
+# vibe2prod stack: Traefik (TLS) -> app (Node demo) -> Postgres 18.
 #
 # Run from the repo root:
 #   docker compose --env-file .env -f common/docker-compose.yml up -d --build
@@ -21,6 +21,8 @@ services:
     image: traefik:v3.4
     restart: unless-stopped
     logging: *default-logging
+    environment:
+      DOCKER_API_VERSION: "1.44"
     command:
       - --log.level=INFO
       - --api.dashboard=false
@@ -72,7 +74,7 @@ services:
       start_period: 10s
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -80,7 +82,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # postgres:18+ moved PGDATA to /var/lib/postgresql/<major>/docker —
+      # mount the parent dir, NOT the old /var/lib/postgresql/data, or the
+      # data lands in an anonymous volume and is lost on container recreation.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

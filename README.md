@@ -31,7 +31,7 @@ Want to try the stack on your machine first? `./deploy.sh local` (requires Docke
 
 - **Traefik v3** — automatic TLS via Let's Encrypt (HTTP-01), 80→443 redirect, security headers, TLS ≥ 1.2. Dashboard disabled.
 - **Demo Node.js app** — plain `node:http`, multi-stage build, slim non-root image. `GET /` serves a landing page, `GET /health` runs a real query against Postgres. Meant to be thrown away — see below.
-- **Postgres 16** — named volume, healthcheck, password auto-generated into your `.env`.
+- **Postgres 18** — named volume, healthcheck, password auto-generated into your `.env`.
 - All containers: `restart: unless-stopped`, log rotation capped at 10 MB × 3 files.
 - `common/scripts/backup-db.sh` — `pg_dump` with 7-day rotation, cron-ready.
 - `common/scripts/update.sh` — pull + rebuild + redeploy, build happens before the swap.

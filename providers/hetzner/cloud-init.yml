@@ -1,5 +1,5 @@
 #cloud-config
-# vibe2prod — first-boot hardening + deploy. Target: Ubuntu 24.04 on Hetzner Cloud.
+# vibe2prod — first-boot hardening + deploy. Target: Ubuntu 26.04 on Hetzner Cloud.
 #
 # __PLACEHOLDERS__ are replaced by providers/hetzner/provision.sh before the
 # file is passed to `hcloud server create --user-data-from-file`.
@@ -51,7 +51,7 @@ write_files:
       MaxAuthTries 3
       X11Forwarding no
 
-  # Ubuntu 24.04 has no /var/log/auth.log out of the box; fail2ban needs the
+  # Ubuntu 24.04+ has no /var/log/auth.log out of the box; fail2ban needs the
   # systemd backend (python3-systemd is in the package list above).
   - path: /etc/fail2ban/jail.local
     permissions: "0644"
