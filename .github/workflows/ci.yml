@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          git ls-files '*.sh' | xargs shellcheck
+
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: common/app/Dockerfile
+
+      - name: docker compose config
+        run: docker compose --env-file .env.example -f common/docker-compose.yml config -q
+
+      - name: cloud-init is valid YAML
+        run: python3 -c "import yaml; yaml.safe_load(open('providers/hetzner/cloud-init.yml'))"

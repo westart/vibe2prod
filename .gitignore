@@ -1,0 +1,14 @@
+# Real configuration — never commit secrets. .env.example is the template.
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts
+backups/
+node_modules/
+*.log
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/

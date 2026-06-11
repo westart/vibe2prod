@@ -1,0 +1,157 @@
+#cloud-config
+# vibe2prod — first-boot hardening + deploy. Target: Ubuntu 24.04 on Hetzner Cloud.
+#
+# __PLACEHOLDERS__ are replaced by providers/hetzner/provision.sh before the
+# file is passed to `hcloud server create --user-data-from-file`.
+#
+# Everything below runs exactly once, on first boot. Progress and errors land
+# in /var/log/cloud-init-output.log on the server.
+
+users:
+  - name: deploy
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBKEY__
+
+ssh_pwauth: false
+
+package_update: true
+# No full dist-upgrade on first boot: it can add several minutes and security
+# patches are handled by unattended-upgrades from day one anyway.
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - ufw
+  - fail2ban
+  - python3-systemd
+  - unattended-upgrades
+
+# 1G swap file — the target boxes are small VPSes and the first
+# `docker compose build` is exactly when they run out of RAM.
+swap:
+  filename: /swapfile
+  size: 1073741824
+  maxsize: 1073741824
+
+write_files:
+  # sshd hardening. Named 00- on purpose: sshd takes the FIRST value it sees
+  # for each option and includes sshd_config.d in lexical order, so this file
+  # must sort before the distro/cloud-init drop-ins.
+  - path: /etc/ssh/sshd_config.d/00-vibe2prod.conf
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      MaxAuthTries 3
+      X11Forwarding no
+
+  # Ubuntu 24.04 has no /var/log/auth.log out of the box; fail2ban needs the
+  # systemd backend (python3-systemd is in the package list above).
+  - path: /etc/fail2ban/jail.local
+    permissions: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      backend = systemd
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  # Default log rotation for every container on the host; the compose file
+  # sets the same limits explicitly per service.
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "3" }
+      }
+
+  # Runtime configuration rendered from the local .env; moved to
+  # /opt/vibe2prod/.env by the bootstrap script after the clone.
+  - path: /root/vibe2prod.env
+    permissions: "0600"
+    content: |
+      DOMAIN=__DOMAIN__
+      ACME_EMAIL=__ACME_EMAIL__
+      POSTGRES_USER=__POSTGRES_USER__
+      POSTGRES_DB=__POSTGRES_DB__
+      POSTGRES_PASSWORD=__POSTGRES_PASSWORD__
+      REPO_URL=__REPO_URL__
+      GIT_REF=__GIT_REF__
+
+  - path: /usr/local/bin/vibe2prod-bootstrap
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # First boot only: firewall, ssh/fail2ban, Docker Engine, clone, deploy.
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+
+      # --- firewall ---------------------------------------------------------
+      ufw default deny incoming
+      ufw default allow outgoing
+      ufw allow 22/tcp
+      ufw allow 80/tcp
+      ufw allow 443/tcp
+      ufw --force enable
+
+      systemctl enable --now fail2ban
+      systemctl restart ssh
+
+      # --- Docker Engine + compose plugin (official Docker apt repo) --------
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      arch="$(dpkg --print-architecture)"
+      codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $codename stable" \
+        > /etc/apt/sources.list.d/docker.list
+      apt-get update -qq
+      apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
+        docker-buildx-plugin docker-compose-plugin
+      usermod -aG docker deploy
+
+      # --- clone + first deploy ---------------------------------------------
+      set -a
+      # shellcheck disable=SC1091
+      . /root/vibe2prod.env
+      set +a
+
+      git clone --depth 1 --branch "$GIT_REF" "$REPO_URL" /opt/vibe2prod
+      mv /root/vibe2prod.env /opt/vibe2prod/.env
+
+      # No domain configured? Fall back to sslip.io on the public IP:
+      # <ip-with-dashes>.sslip.io resolves to the IP, no DNS setup needed.
+      if grep -q '^DOMAIN=auto$' /opt/vibe2prod/.env; then
+        ip="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/public-ipv4)"
+        domain="$(printf '%s' "$ip" | tr '.' '-').sslip.io"
+        sed -i "s/^DOMAIN=auto$/DOMAIN=$domain/" /opt/vibe2prod/.env
+      fi
+
+      # Let's Encrypt wants a syntactically valid contact address.
+      if grep -q '^ACME_EMAIL=$' /opt/vibe2prod/.env; then
+        domain="$(grep '^DOMAIN=' /opt/vibe2prod/.env | cut -d= -f2)"
+        sed -i "s/^ACME_EMAIL=$/ACME_EMAIL=admin@$domain/" /opt/vibe2prod/.env
+      fi
+
+      chown -R deploy:deploy /opt/vibe2prod
+      cd /opt/vibe2prod
+      docker compose --env-file .env -f common/docker-compose.yml up -d --build
+
+runcmd:
+  - [/usr/local/bin/vibe2prod-bootstrap]
+
+final_message: "vibe2prod bootstrap finished after $UPTIME seconds"

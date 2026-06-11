@@ -1,0 +1,14 @@
+# Baseline security headers, applied to every request on the websecure
+# entrypoint (see the entrypoint middleware flag in docker-compose.yml).
+http:
+  middlewares:
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        referrerPolicy: strict-origin-when-cross-origin
+        stsSeconds: 31536000
+        # Deliberately NOT setting stsIncludeSubdomains: with the sslip.io
+        # fallback you don't own the parent domain, and on your own domain
+        # you may have non-TLS subdomains. Opt in once you know you want it.
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
