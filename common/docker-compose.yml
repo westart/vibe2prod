@@ -27,6 +27,9 @@ services:
     command:
       - --log.level=INFO
       - --api.dashboard=false
+      # No phone-home: the version is pinned, the "new release" nag is noise.
+      - --global.checknewversion=false
+      - --global.sendanonymoususage=false
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --providers.file.directory=/etc/traefik/dynamic

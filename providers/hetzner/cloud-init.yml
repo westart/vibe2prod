@@ -125,12 +125,14 @@ write_files:
       usermod -aG docker deploy
 
       # --- clone + first deploy ---------------------------------------------
-      set -a
-      # shellcheck disable=SC1091
-      . /root/vibe2prod.env
-      set +a
+      # Read ONLY what the bootstrap itself needs. Never source/export the
+      # whole env file: exported variables take precedence over --env-file
+      # during compose interpolation, so an exported DOMAIN=auto would
+      # override the corrected value written to .env below.
+      repo_url="$(grep '^REPO_URL=' /root/vibe2prod.env | cut -d= -f2-)"
+      git_ref="$(grep '^GIT_REF=' /root/vibe2prod.env | cut -d= -f2-)"
 
-      git clone --depth 1 --branch "$GIT_REF" "$REPO_URL" /opt/vibe2prod
+      git clone --depth 1 --branch "$git_ref" "$repo_url" /opt/vibe2prod
       mv /root/vibe2prod.env /opt/vibe2prod/.env
 
       # No domain configured? Fall back to sslip.io on the public IP:

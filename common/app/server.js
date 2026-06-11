@@ -40,7 +40,7 @@ const page = `<!doctype html>
   <ul>
     <li>HTTPS via Let's Encrypt (auto-renewing)</li>
     <li>Traefik v3 reverse proxy</li>
-    <li>Postgres 16 — check <a href="/health"><code>/health</code></a></li>
+    <li>Postgres 18 — check <a href="/health"><code>/health</code></a></li>
     <li>Firewalled, fail2ban'd, auto-patched Ubuntu</li>
   </ul>
   <p>Next step: replace this demo with your app.<br>
