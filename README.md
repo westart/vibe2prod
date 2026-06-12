@@ -83,6 +83,15 @@ Tracked as [issues](https://github.com/westart/vibe2prod/issues):
 
 Contributions welcome — especially new providers following the `providers/hetzner/` pattern.
 
+## AI-assisted, human-supervised
+
+This project is built with AI assistance ([Claude Code](https://claude.com/claude-code) —
+see [CLAUDE.md](CLAUDE.md) for the project briefing it works from). AI writes faster;
+it doesn't decide what ships. Every change — every line, every config flag — is
+reviewed, tested and signed off by a human who runs servers for a living. The
+hard-won gotchas documented in this repo (Traefik vs Docker 29, the PG18 data
+mount, compose env precedence) came from real debugging, not from a prompt.
+
 ## License
 
 [MIT](LICENSE) © Westart — Marco Serritella
